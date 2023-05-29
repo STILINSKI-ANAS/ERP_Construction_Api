@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use App\Models\projet;
 
@@ -10,14 +11,14 @@ class ProjetController extends Controller
     //
     public function store(Request $request){
         $request->validate([
-            'name'=>'required',
-            'adress'=>'required',
-            'invested'=>'required',
-            'payed'=>'required',
-            'balance'=>'required',
-            'num_employee'=>'required',
+            'name'=>'',
+            'addresse'=>'',
         ]);
-        return projet::create($request->all());
+        return projet::create(array_merge($request->all(),
+            ['name' => 'noName'],
+            ['charges'=>0],
+            ['produits'=>0],
+            ['balance'=>0]));
     }
 
     public function show (Request $request, $id){
@@ -42,5 +43,13 @@ class ProjetController extends Controller
 
     public function search($name){
         return projet::where('name', 'like','%'.$name.'%')->get();
+    }
+    public function generatePDF()
+    {
+//        $data = [1,2,3];
+        Pdf::setOption(['dpi' => 10, 'defaultFont' => 'Inter', 'debugCss' =>true]);
+        $pdf = Pdf::loadView('pdf.facture')->setWarnings(false);
+        return $pdf->download('Hi.pdf');
+//        return 1;
     }
 }

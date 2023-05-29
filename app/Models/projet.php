@@ -11,7 +11,7 @@ class projet extends Model
 
     protected $fillable = [
         'name',
-        'adress',
+        'addresse',
         'charges',
         'produits',
         'balance',
@@ -25,5 +25,9 @@ class projet extends Model
     public function clients()
     {
         return $this->belongsToMany(client::class);
+    }
+    public function projetWorkers()
+    {
+        return $this->hasMany(WorkerProjet::class);
     }
 }

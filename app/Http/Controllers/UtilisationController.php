@@ -27,6 +27,7 @@ class UtilisationController extends Controller
 
         $entrepot = Entrepot::find($request->entrepot_id);
         $prix_total = $entrepot->prix_vente * $request->quantity;
+        $sommeO = DB::table('utilisations')->where('projet_id',  $request->projet_id)->sum('prix_total');
 
         $utilisation = Utilisation::create(array_merge(
             $request->all(),
@@ -34,12 +35,13 @@ class UtilisationController extends Controller
         ));
 
         $projet = projet::find($utilisation->projet_id);
-        $utilisations = DB::table('utilisations')->where('projet_id', $projet->id)->sum('prix_total');
-        $balance = $projet->produits - $utilisations;
+        $sommeN = DB::table('utilisations')->where('projet_id', $projet->id)->sum('prix_total');
+        $charges = $projet->charges + $prix_total;
+        $balance = $projet->produits - $charges;
 
         $projet->update(array_merge(
             ['balance' => $balance],
-            ['charges' => $utilisations],
+            ['charges' => $charges],
 
         ));
 
@@ -62,9 +64,8 @@ class UtilisationController extends Controller
     public function update(Request $request, $id)
     {
         $utilisation = Utilisation::find($id);
-
-        $oldUtilQuantity = $utilisation->quantity;
-
+        $oldPrix_total = $utilisation->prix_total;
+        $oldQuantity = $utilisation->quantity;
         if (!$utilisation) {
             return response()->json(['error' => 'Utilisation not found.'], 404);
         }
@@ -73,40 +74,41 @@ class UtilisationController extends Controller
             'projet_id' => 'exists:projets,id',
             'entrepot_id' => 'exists:entrepot,id',
             'quantity' => 'numeric|min:1',
+            'prix_total' => '',
             // add validation rules for other fields as needed
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
-
-        $utilisation->update(array_merge(
-            $request->all()
-        ));
-
-        $entrepot = Entrepot::find($utilisation->entrepot_id);
-        $prix_total = $entrepot->prix_vente * $utilisation->quantity;
-
-        $utilisation->update(array_merge(
-            ['prix_total' => $prix_total]
-        ));
-
         $projet = projet::find($utilisation->projet_id);
-        $utilisations = DB::table('utilisations')->where('projet_id', $projet->id)->sum('prix_total');
-        $balance = $projet->produits - $utilisations;
+        $entrepot = Entrepot::find($utilisation->entrepot_id);
+//        utilisation->quantity, prix_total
+//        projet->charges, balance
+//        entrepot->quantity
 
-        $projet->update(array_merge(
-            ['balance' => $balance],
-            ['charges' => $utilisations],
+        $newQuantity = $request->quantity;
+        $newPrix_total = $entrepot->prix_vente * $newQuantity;
 
+        $utilisation->update(array_merge(
+            ['quantity' => $newQuantity],
+            ['prix_total' => $newPrix_total]
         ));
-        $oldQuantity = $entrepot->quantity;
 
+        $diff = $newPrix_total - $oldPrix_total;
+        $charges = $projet->charges + $diff;
+        $balance = $projet->produits - $charges;
 
-        $newQuantity = $oldQuantity  + $oldUtilQuantity - $request->quantity;
+        $projet->update([
+            'balance' => $balance,
+            'charges' => $charges,
+        ]);
+
+        $diff = $newQuantity - $oldQuantity;
+        $newEntrQuantity = $entrepot->quantity + $diff;
 
         $entrepot->update(array_merge(
-            ['quantity' => $newQuantity],
+            ['quantity' => $newEntrQuantity],
         ));
 
 
@@ -122,8 +124,8 @@ class UtilisationController extends Controller
         $projet = projet::find($utilisation->projet_id);
         $entrepot = Entrepot::find($utilisation->entrepot_id);
 
-        $balance= $projet->balance + $utilisation->prix_total;
         $charges= $projet->charges - $utilisation->prix_total;
+        $balance = $projet->produits - $charges;
 
 
         $projet->update(array_merge(
